@@ -54,3 +54,4 @@ dkms.conf
 # Zig build system artifacts
 zig-out/
 zig-cache/
+.zig-cache/

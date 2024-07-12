@@ -1,10 +1,11 @@
 /*****************************************************************************/
 /*
  * Main file for XPSNR command line driver.
- * 
+ *
  * Driver written by EMMIR (LMP88959)
+ * some code by Gianni Rosato (not much)
  * XPSNR written by Christian Helmrich and Christian Stoffers
- * 
+ *
  * Driver (main.c, util.c, util.h) is public domain.
  */
 /*****************************************************************************/
@@ -17,8 +18,8 @@
 #include <limits.h>
 #include <errno.h>
 
-#define DRV_VERSION "1.0"
-#define DRV_HEADER "Command line XPSNR driver v"DRV_VERSION"\n"
+#define DRV_VERSION "1.0.1"
+#define DRV_HEADER "Standalone XPSNR CLI | \x1b[36mv"DRV_VERSION"\x1b[0m\n"
 
 static char *progname = NULL;
 static int verbose = 0;
@@ -57,19 +58,19 @@ struct PARAM {
 };
 
 static struct PARAM dec_params[] = {
-    { "w", 352, 16, (1 << 24), NULL,
+    { "w=", 352, 16, (1 << 24), NULL,
             "width of input video. 352 = default" },
-    { "h", 288, 16, (1 << 24), NULL,
+    { "h=", 288, 16, (1 << 24), NULL,
             "height of input video. 288 = default" },
-    { "fmt", DSV_SUBSAMP_420, 0, 3, fmt_to_subsamp,
+    { "fmt=", DSV_SUBSAMP_420, 0, 3, fmt_to_subsamp,
             "chroma subsampling format of input video. 0 = 4:4:4, 1 = 4:2:2, 2 = 4:2:0, 3 = 4:1:1, 2 = default" },
-    { "nfr", -1, -1, INT_MAX, NULL,
+    { "nfr=", -1, -1, INT_MAX, NULL,
             "number of frames to compress. -1 means as many as possible. -1 = default" },
-    { "fps_num", 30, 1, (1 << 24), NULL,
+    { "fps_num=", 30, 1, (1 << 24), NULL,
             "fps numerator of input video. 30 = default" },
-    { "fps_den", 1, 1, (1 << 24), NULL,
+    { "fps_den=", 1, 1, (1 << 24), NULL,
             "fps denominator of input video. 1 = default" },
-    { "y4m", 0, 0, 1, NULL,
+    { "y4m=", 0, 0, 1, NULL,
             "set to 1 if input is in Y4M format, 0 if raw YUV. 0 = default" },
     { NULL, 0, 0, 0, NULL, "" }
 };
@@ -96,29 +97,36 @@ static void
 print_params(struct PARAM *pars)
 {
     int i;
-    
-    printf("------------------------------------------------------------\n");
+
+    printf("\n");
     for (i = 0; pars[i].prefix != NULL; i++) {
         struct PARAM *par = &pars[i];
-        
+
         printf("\t-%s : %s\n", par->prefix, par->desc);
         printf("\t      [min = %d, max = %d]\n", par->min, par->max);
     }
-    printf("\t-dec_ : decoded input file.\n");
-    printf("\t-ref_ : reference input file.\n");
-    printf("\t-v : set verbose\n");
+    printf("\t-dst= : distorted input file.\n");
+    printf("\t-ref= : reference input file.\n");
+    printf("\t-v    : set verbose\n");
+}
+
+static void
+sample_usage(char* p)
+{
+    printf("\x1b[2mSample usage: %s -dst=decoded.y4m -ref=original.y4m -y4m=1\x1b[0m\n", p);
+    printf("\x1b[2mSample usage: %s -dst=decoded.yuv -ref=original.yuv -w=352 -h=288 -fmt=2 -fps_num=30\x1b[0m\n", p);
 }
 
 static void
 usage(void)
 {
     char *p = progname;
-    
+
     printf(DRV_HEADER);
-    printf("usage: %s [options]\n", p);
-    printf("sample usage: %s -dec_decoded.y4m -ref_original.y4m -y4m1\n", p);
-    printf("sample usage: %s -dec_decoded.yuv -ref_original.yuv -w352 -h288 -fmt2 -fps_num30\n", p);
+    printf("\n\x1b[4mUsage\x1b[0m:\n\t%s [\x1b[36moptions\x1b[0m]\n\n", p);
+    printf("\x1b[4mParameters\x1b[0m:");
     print_params(dec_params);
+    sample_usage(p);
 }
 
 static int
@@ -131,13 +139,13 @@ stoint(char *s, int *err)
     *err = 0;
     val = strtol(s, &tail, 10);
     if (errno == ERANGE) {
-        fprintf(stderr, "integer out of integer range\n");
+        fprintf(stderr, "\x1b[31mError: Integer out of integer range\x1b[0m\n");
         *err = 1;
     } else if (errno != 0) {
-        fprintf(stderr, "bad string: %s\n", strerror(errno));
+        fprintf(stderr, "\x1b[31mError: Bad string: %s\x1b[0m\n", strerror(errno));
         *err = 1;
     } else if (*tail != '\0') {
-        fprintf(stderr, "integer contained non-numeric characters\n");
+        fprintf(stderr, "\x1b[31mError: Integer contained non-numeric characters\x1b[0m\n");
         *err = 1;
     }
     return val;
@@ -161,9 +169,9 @@ get_param(char *argv)
     char *p = argv;
     int err = 0;
     struct PARAM *params;
-    
+
     if (*p != '-') {
-        fprintf(stderr, "strange argument: %s\n", p);
+        fprintf(stderr, "\x1b[33mStrange argument: %s\x1b[0m\n", p);
         return 0;
     }
 
@@ -172,11 +180,11 @@ get_param(char *argv)
         verbose = 1;
         return 1;
     }
-    if (prefixcmp("dec_", &p)) {
+    if (prefixcmp("dst=", &p)) {
         opts.inp_dec = p;
         return 1;
     }
-    if (prefixcmp("ref_", &p)) {
+    if (prefixcmp("ref=", &p)) {
         opts.inp_ref = p;
         return 1;
     }
@@ -189,12 +197,12 @@ get_param(char *argv)
         par->value = CLAMP(par->value, par->min, par->max);
         par->value = par->convert ? par->convert(stoint(p, &err)) : stoint(p, &err);
         if (err) {
-            fprintf(stderr, "error reading argument: %s\n", par->prefix);
+            fprintf(stderr, "\x1b[31mError reading argument: \"%s\"\x1b[0m\n", par->prefix);
             return 0;
         }
         return 1;
     }
-    fprintf(stderr, "unrecognized argument(s)\n");
+    fprintf(stderr, "\x1b[31mError: Unrecognized argument(s)\x1b[0m\n");
     return 0;
 }
 
@@ -204,7 +212,7 @@ init_params(int argc, char **argv)
     int i;
 
     if (argc == 1) {
-        fprintf(stderr, "not enough args!\n");
+        fprintf(stderr, "\x1b[31mError: Insufficient argument count\x1b[0m\n");
         usage();
         return 0;
     }
@@ -224,31 +232,31 @@ init_params(int argc, char **argv)
 
 static XPSNR_FRAME *
 load_planar_frame(int format, void *data, int width, int height)
-{    
+{
     XPSNR_FRAME *f;
     int hs, vs;
 
     f = xpsnr_allocz(sizeof(XPSNR_FRAME));
     hs = DSV_FORMAT_H_SHIFT(format);
     vs = DSV_FORMAT_V_SHIFT(format);
-    
+
     f->planes[0].format = format;
     f->planes[0].w = width;
     f->planes[0].h = height;
     f->planes[0].stride = width;
     f->planes[0].data = data;
     f->planes[0].len = f->planes[0].stride * f->planes[0].h;
-    
+
     width = DSV_ROUND_SHIFT(width, hs);
     height = DSV_ROUND_SHIFT(height, vs);
-    
+
     f->planes[1].format = format;
     f->planes[1].w = width;
     f->planes[1].h = height;
     f->planes[1].stride = f->planes[1].w;
     f->planes[1].len = f->planes[1].stride * f->planes[1].h;
     f->planes[1].data = f->planes[0].data + f->planes[0].len;
-    
+
     f->planes[2].format = format;
     f->planes[2].w = width;
     f->planes[2].h = height;
@@ -271,7 +279,7 @@ readframes(void)
     uint8_t *decdata;
     XPSNRContext xpctx;
     double lxp, uxp, vxp;
-    
+
     decfile = fopen(opts.inp_dec, "rb");
     if (decfile == NULL) {
         fprintf(stderr, "error opening input file %s\n", opts.inp_dec);
@@ -282,19 +290,19 @@ readframes(void)
         fprintf(stderr, "error opening input file %s\n", opts.inp_ref);
         return EXIT_FAILURE;
     }
-    
-    w = get_optval(dec_params, "w");
-    h = get_optval(dec_params, "h");
+
+    w = get_optval(dec_params, "w=");
+    h = get_optval(dec_params, "h=");
     md.width = w;
     md.height = h;
-    md.subsamp = get_optval(dec_params, "fmt");
-    md.fps_num = get_optval(dec_params, "fps_num");
-    md.fps_den = get_optval(dec_params, "fps_den");
+    md.subsamp = get_optval(dec_params, "fmt=");
+    md.fps_num = get_optval(dec_params, "fps_num=");
+    md.fps_den = get_optval(dec_params, "fps_den=");
 
-    y4m_in = get_optval(dec_params, "y4m");
+    y4m_in = get_optval(dec_params, "y4m=");
     if (y4m_in) {
         int fr[2] = { 1, 1 };
-        
+
         if (!dsv_y4m_read_hdr(reffile, &md.width, &md.height, &md.subsamp, fr)) {
             fprintf(stderr, "(ref) bad Y4M file %s\n", opts.inp_ref);
             return EXIT_FAILURE;
@@ -306,7 +314,7 @@ readframes(void)
             return EXIT_FAILURE;
         }
         if (w != md.width || h != md.height) {
-            fprintf(stderr, "dec and ref dimensions do not match! %dx%d vs %dx%d\n", md.width, md.height, w, h);
+            fprintf(stderr, "dst & ref dimensions do not match! %dx%d vs %dx%d\n", md.width, md.height, w, h);
             return EXIT_FAILURE;
         }
         md.fps_num = fr[0];
@@ -321,7 +329,7 @@ readframes(void)
     decdata = xpsnr_allocz(w * h * (3 + EXTRA_PAD)); /* allocate extra to be safe */
     refdata = xpsnr_allocz(w * h * (3 + EXTRA_PAD));
 
-    nfr = get_optval(dec_params, "nfr");
+    nfr = get_optval(dec_params, "nfr=");
     if (nfr > 0) {
         maxframe = frno + nfr;
     } else {
@@ -375,7 +383,7 @@ readframes(void)
         xpsnr_free(reff);
         xpsnr_free(decf);
         xpctx.numFrames64++;
-        frno++;    
+        frno++;
     }
     lxp = getAvgXPSNR(xpctx.sumWDist[0], xpctx.sumXPSNR[0],
             xpctx.planeWidth[0], xpctx.planeHeight[0], xpctx.maxError64,
@@ -394,7 +402,7 @@ readframes(void)
     fclose(reffile);
     xpsnr_free(decdata);
     xpsnr_free(refdata);
-    
+
     return EXIT_SUCCESS;
 }
 
@@ -405,11 +413,11 @@ startup(int argc, char **argv)
         return EXIT_SUCCESS;
     }
     if (!opts.inp_dec || !opts.inp_ref) {
-        fprintf(stderr, "dec_ or ref_ was not specified!\n");
+        fprintf(stderr, "dst= or ref= was not specified!\n");
         usage();
         return EXIT_FAILURE;
     }
-    
+
     return readframes();
 }
 

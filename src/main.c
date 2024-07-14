@@ -278,7 +278,7 @@ readframes(void)
     uint8_t *refdata;
     uint8_t *decdata;
     XPSNRContext xpctx;
-    double lxp, uxp, vxp;
+    double lxp, uxp, vxp, yuvxp, wxp, hm;
 
     decfile = fopen(opts.inp_dec, "rb");
     if (decfile == NULL) {
@@ -336,23 +336,24 @@ readframes(void)
         maxframe = -1;
     }
     if (verbose) {
-        printf("%s video\n", y4m_in ? "YUV4MPEG2" : "Raw YUV");
-        printf("%dx%d @ %d/%d frames per second\n", w, h, md.fps_num, md.fps_den);
+        printf("%s video | ", y4m_in ? "YUV4MPEG2" : "Raw YUV");
+        printf("%dx%d @ %d/%d frames per second | ", w, h, md.fps_num, md.fps_den);
         switch (md.subsamp) {
             case DSV_SUBSAMP_444:
-                printf("Planar YUV 4:4:4\n");
+                puts("Planar YUV 4:4:4");
                 break;
             case DSV_SUBSAMP_422:
-                printf("Planar YUV 4:2:2\n");
+                puts("Planar YUV 4:2:2");
                 break;
             case DSV_SUBSAMP_420:
-                printf("Planar YUV 4:2:0\n");
+                puts("Planar YUV 4:2:0");
                 break;
             case DSV_SUBSAMP_411:
-                printf("Planar YUV 4:1:1\n");
+                puts("Planar YUV 4:1:1");
                 break;
         }
     }
+    puts("Calculating XPSNR...");
     memset(&xpctx, 0, sizeof(xpctx));
 
     while (1) {
@@ -394,9 +395,13 @@ readframes(void)
     vxp = getAvgXPSNR(xpctx.sumWDist[2], xpctx.sumXPSNR[2],
             xpctx.planeWidth[2], xpctx.planeHeight[2], xpctx.maxError64,
             xpctx.numFrames64);
-    printf("XPSNR Y = %f\n", lxp);
-    printf("XPSNR U = %f\n", uxp);
-    printf("XPSNR V = %f\n", vxp);
+    yuvxp = (lxp + uxp + vxp) / 3.0;
+    wxp = ((lxp * 4.0) + uxp + vxp) / 6.0;
+    hm = 3.0 / ((1.0 / lxp) + (1.0 / uxp) + (1.0 / vxp));
+    printf("---\n");
+    printf("XPSNR Y \t= %f | XPSNR YUV\t\t= %f\n", lxp, yuvxp);
+    printf("XPSNR U \t= %f | HarmMean YUV\t= %f\n", uxp, hm);
+    printf("XPSNR V \t= %f | Weighted XPSNR\t= %f\n", vxp, wxp);
 
     fclose(decfile);
     fclose(reffile);

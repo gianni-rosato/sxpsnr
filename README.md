@@ -41,6 +41,7 @@ Sample usage: sxpsnr -dst=decoded.yuv -ref=original.yuv -w=352 -h=288 -fmt=2 -fp
 
 ```bash
 git clone https://github.com/gianni-rosato/sxpsnr.git
+cd sxpsnr
 ```
 
 2. Build the binary with Zig:

@@ -2,12 +2,16 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
+    const strip = b.option(bool, "strip", "Strip symbols from the binary. Default: false") orelse false;
 
     // Create the executable
     const bin = b.addExecutable(.{
         .name = "sxpsnr",
         .target = target,
-        .optimize = .ReleaseFast,
+        .link_libc = true,
+        .optimize = optimize,
+        .strip = strip,
     });
 
     // Add C source files
@@ -20,11 +24,11 @@ pub fn build(b: *std.Build) void {
         .flags = &.{
             "-std=c99",
             "-lm",
-            "-O3",
+            "-Wall",
+            "-Wextra",
+            "-Wpedantic",
         },
     });
 
-    // Link libc
-    bin.linkLibC();
     b.installArtifact(bin);
 }
